@@ -7,15 +7,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use Illuminate\Support\Facades\Artisan;
 
 // Setup temporaire — migration + seed
-Route::get('/setup', function () {
-    try {
-        Artisan::call('migrate', ['--force' => true]);
-        Artisan::call('db:seed', ['--force' => true]);
-        return response()->json(['message' => 'Migration et seed réussis !']);
-    } catch (\Exception $e) {
-        return response()->json(['error' => $e->getMessage()], 500);
-    }
-});
+
 
 // Public
 Route::post('/contact', [ContactController::class, 'store']);
