@@ -1,13 +1,13 @@
-FROM php:8.2-apache
+FROM php:8.2-cli
 
 # Install extensions
 RUN apt-get update && apt-get install -y \
-    libzip-dev zip unzip git curl \
+    libzip-dev zip unzip git curl libpng-dev libxml2-dev \
     && docker-php-ext-install pdo pdo_mysql zip \
-    && apt-get clean
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Set working directory
 WORKDIR /var/www/html
@@ -15,30 +15,23 @@ WORKDIR /var/www/html
 # Copy composer files first
 COPY composer.json composer.lock ./
 
-# Install dependencies with memory limit
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
+# Install dependencies
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --no-scripts \
+    --no-interaction \
+    --prefer-dist
 
 # Copy all files
 COPY . .
 
-# Run post-install scripts
-RUN COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --optimize
+# Generate autoload
+RUN php artisan key:generate --force || true
 
 # Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chmod -R 775 storage bootstrap/cache
 
-# Apache config
-RUN echo '<VirtualHost *:80>\n\
-    DocumentRoot /var/www/html/public\n\
-    <Directory /var/www/html/public>\n\
-        AllowOverride All\n\
-        Require all granted\n\
-    </Directory>\n\
-</VirtualHost>' > /etc/apache2/sites-available/000-default.conf
+EXPOSE 8000
 
-RUN a2enmod rewrite
-
-EXPOSE 80
-
-CMD ["apache2-foreground"]
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
